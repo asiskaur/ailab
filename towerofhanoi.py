@@ -7,3 +7,5 @@ def TowerOfHanoi(n , source, destination, auxiliary):
     TowerOfHanoi(n-1, auxiliary, destination, source) 
     
 n = int(input("Enter number of Disks:")
+############################################        
+TowerOfHanoi(n,'A','B','C')        
