@@ -1,163 +1,200 @@
+def get_index_comma(string):
+    """
+    Return index of commas in string
+    """
 
-   
-#verify if an expression is an atom
-def isAtom(e):
-    return len(e)==1
+    index_list = list()
+    # Count open parentheses
+    par_count = 0
 
+    for i in range(len(string)):
+        if string[i] == ',' and par_count == 0:
+            index_list.append(i)
+        elif string[i] == '(':
+            par_count += 1
+        elif string[i] == ')':
+            par_count -= 1
 
-#return an expression from a function f(...)
-def expression(e):
-    #list contains the elements of the expression
-    listofelements=[]
-    #remove the ()
-    expr=e[e.find("(")+1:e.rfind(")")]
+    return index_list
 
-    #while the expression still contains elements
-    while not expr=="":
-        #the expression contains only 1 element
-        if not ',' in expr:
-            listofelements.append(expr)
-            expr=""
+def is_variable(expr):
+    """
+    Check if expression is variable
+    """
+
+    for i in expr:
+        if i == '(':
+            return False
+
+    return True
+
+def process_expression(expr):
+    """
+    input:  - expression:
+            'Q(a, g(x, b), f(y))'
+    return: - predicate symbol:
+            Q
+            - list of arguments
+            ['a', 'g(x, b)', 'f(y)']
+    """
+
+    # Remove space in expression
+    expr = expr.replace(' ', '')
+
+    # Find the first index == '('
+    index = None
+    for i in range(len(expr)):
+        if expr[i] == '(':
+            index = i
+            break
+
+    # Return predicate symbol and remove predicate symbol in expression
+    predicate_symbol = expr[:index]
+    expr = expr.replace(predicate_symbol, '')
+
+    # Remove '(' in the first index and ')' in the last index
+    expr = expr[1:len(expr) - 1]
+
+    # List of arguments
+    arg_list = list()
+
+    # Split string with commas, return list of arguments
+    indices = get_index_comma(expr)
+
+    if len(indices) == 0:
+        arg_list.append(expr)
+    else:
+        arg_list.append(expr[:indices[0]])
+        for i, j in zip(indices, indices[1:]):
+            arg_list.append(expr[i + 1:j])
+        arg_list.append(expr[indices[len(indices) - 1] + 1:])
+
+    return predicate_symbol, arg_list
+
+def get_arg_list(expr):
+    """
+    input:  expression:
+            'Q(a, g(x, b), f(y))'
+    return: full list of arguments:
+            ['a', 'x', 'b', 'y']
+    """
+
+    _, arg_list = process_expression(expr)
+
+    flag = True
+    while flag:
+        flag = False
+
+        for i in arg_list:
+            if not is_variable(i):
+                flag = True
+                _, tmp = process_expression(i)
+                for j in tmp:
+                    if j not in arg_list:
+                        arg_list.append(j)
+                arg_list.remove(i)
+
+    return arg_list
+
+def check_occurs(var, expr):
+    """
+    Check if var occurs in expr
+    """
+
+    arg_list = get_arg_list(expr)
+    if var in arg_list:
+        return True
+
+    return False
+
+def unify(expr1, expr2):
+    """
+    Unification Algorithm
+    Step 1: If Ψ1 or Ψ2 is a variable or constant, then:
+              a, If Ψ1 or Ψ2 are identical, then return NULL.
+              b, Else if Ψ1 is a variable:
+                  - then if Ψ1 occurs in Ψ2, then return False
+                  - Else return (Ψ2 / Ψ1)
+              c, Else if Ψ2 is a variable:
+                  - then if Ψ2 occurs in Ψ1, then return False
+                  - Else return (Ψ1 / Ψ2)
+              d, Else return False
+    Step 2: If the initial Predicate symbol in Ψ1 and Ψ2 are not same, then return False.
+    Step 3: IF Ψ1 and Ψ2 have a different number of arguments, then return False.
+    Step 4: Create Substitution list.
+    Step 5: For i=1 to the number of elements in Ψ1.
+              a, Call Unify function with the ith element of Ψ1 and ith element of Ψ2, and put the result into S.
+              b, If S = False then returns False
+              c, If S ≠ Null then append to Substitution list
+    Step 6: Return Substitution list.
+    """
+
+    # Step 1:
+    if is_variable(expr1) and is_variable(expr2):
+        if expr1 == expr2:
+            return 'Null'
         else:
-            #if the first element in the expression is not a function
-            if not '(' in expr[:expr.find(',')]:
-                listofelements.append(expr[:expr.find(',')])
-                expr=expr[expr.find(',')+1:]
-            else:
-                #if the first element in the expression is a function
-                begin=0
-                end=0
-                nb_of_opening_par=0
-                nb_of_closing_par=0
-                end_of_elements=False
-                i=0
-                while not end_of_elements:
-                    c=expr[i]
-                    if c=='(':
-                        if begin==0:
-                            begin=i
-                        nb_of_opening_par+=1
-                    else:
-                        if c==')':
-                            nb_of_closing_par+=1
-                            if nb_of_opening_par==nb_of_closing_par and nb_of_opening_par>0:
-                                end=i
-                                end_of_elements=True
-                                i=0
-                    i+=1
-                listofelements.append(expr[begin-1:end+1])
-                #In case of the last element is a function
-                if end==len(expr)-1:
-                    expr=""
+            return False
+    elif is_variable(expr1) and not is_variable(expr2):
+        if check_occurs(expr1, expr2):
+            return False
+        else:
+            tmp = str(expr2) + '/' + str(expr1)
+            return tmp
+    elif not is_variable(expr1) and is_variable(expr2):
+        if check_occurs(expr2, expr1):
+            return False
+        else:
+            tmp = str(expr1) + '/' + str(expr2)
+            return tmp
+    else:
+        predicate_symbol_1, arg_list_1 = process_expression(expr1)
+        predicate_symbol_2, arg_list_2 = process_expression(expr2)
+
+        # Step 2
+        if predicate_symbol_1 != predicate_symbol_2:
+            return False
+        # Step 3
+        elif len(arg_list_1) != len(arg_list_2):
+            return False
+        else:
+            # Step 4: Create substitution list
+            sub_list = list()
+
+            # Step 5:
+            for i in range(len(arg_list_1)):
+                tmp = unify(arg_list_1[i], arg_list_2[i])
+
+                if not tmp:
+                    return False
+                elif tmp == 'Null':
+                    pass
                 else:
-                    expr=expr[end+2:]
-    return  listofelements
+                    if type(tmp) == list:
+                        for j in tmp:
+                            sub_list.append(j)
+                    else:
+                        sub_list.append(tmp)
 
+            # Step 6
+            return sub_list
 
-#unify two expressions, expr1 and expr2 are 2 lists of strings
-def unify(expr1,expr2):
-    #if one of the expression is an Atom
-    if isAtom(expr1) or isAtom(expr2):
-        return unifyAtoms(expr1,expr2)
-    #get the first element from expr1
-    f1=expr1[0]
-    #save the rest
-    del expr1[0]
-    t1=expr1
+if __name__ == '__main__':
+    # Data 1
+    f1 = 'p(b(A), X, f(g(Z)))'
+    f2 = 'p(Z, f(Y), f(Y))'
 
-    #get the first element from expr2
-    f2=expr2[0]
-    #save the rest
-    del expr2[0]
-    t2=expr2
-    #---
-    e1=[f1]
-    e2=[f2]
-    #unify the 2 first expressions from expr1 and expr2
-    z1=unify(e1,e2)
+    # Data 2
+    # f1 = 'Q(a, g(x, a), f(y))'
+    # f2 = 'Q(a, g(f(b), a), x)'
 
-    #if fail
-    if z1=="FAIL":
-        return "FAIL"
+    # Data 3
+    # f1 = 'Q(a, g(x, a, d), f(y))'
+    # f2 = 'Q(a, g(f(b), a), x)'
 
-    #apply substitution on the rest of expr1 and expr2
-    g1=substitute(t1,z1)
-    g2=substitute(t2,z1)
-    #unify the rest
-    z2=unify(g1,g2)
-    if z2=="FAIL":
-        return "FAIL"
-    return z1+" "+z2
-
-
-#substitution of t1 by the unifier z1
-def substitute(t1,z1):
-    chg=z1.strip().split()
-    tmp=[]
-    for i in chg:
-        tmp.append(i.split('/'))
-    b=[]
-    for i in tmp:
-        for j in i:
-            b.append(j)
-
-    if not z1=="":
-        for i in range(0,len(t1)):
-            for j in range(0,len(b),2):
-                t1[i]=t1[i].replace(b[j],b[j+1])
-    return t1
-
-
-
-#unify 2 atoms
-def unifyAtoms(ex1,ex2):
-    e1=ex1[0]
-    e2=ex2[0]
-    #e1 et e2 are the same
-    if e1==e2:
-        return ""
-    #e1 variable
-    if e1[0]=='?':
-        #e2 contains e1 ==> FAIL
-        if e1 in e2:
-            return "FAIL"
-        #otherwise
-        return e1+"/"+e2
-    #e2 variable
-    if e2[0]=='?':
-        return e2+"/"+e1
-    #e1 and e2 2 functions
-    if (('(' in e1) and ('(' in e2)):
-        l1=expression(e1)
-        l2=expression(e2)
-        return unify(l1,l2)
-    #else
-    return "FAIL"
-
-#read test cases
-def readTC(filename):
-    expressions=[]
-    file=open(filename,"r")
-    for testcase in file.read().split('\n'):
-        expressions.append(testcase)
-    return expressions
-
-
-
-
-
-#------- TEST ---------
-tracefile=open("trace.txt","w")
-testcases=readTC("test.txt")
-i=1
-for testcase in testcases:
-    tracefile.write("****** TEST CASE N"+str(i)+"\n")
-    exprs=testcase.split(':')
-    expr1=exprs[0]
-    expr2=exprs[1]
-    tracefile.write("Expression 1: "+expr1+"\n")
-    tracefile.write("Expression 2: "+expr2+"\n")
-    tracefile.write("------- UNIFICATION -------- \n")
-    tracefile.write(unify(expression(expr1),expression(expr2)))
-    tracefile.write("\n\n")
-    i+=1
+    result = unify(f1, f2)
+    if not result:
+        print('Unification failed!')
+    else:
+        print('Unification successfully!')
+        print(result)
