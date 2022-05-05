@@ -55,6 +55,4 @@ def solveNQ():
     printSolution(board) 
     return True
   
-//////////////////////////////////////////////////////////////
-  
 solveNQ()  
